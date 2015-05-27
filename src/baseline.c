@@ -380,22 +380,24 @@ static s8 lesq_without_i(u8 dropped_dd, u8 num_dds, const double *dd_obs,
  */
 static bool chi_test(u8 num_dds, double *residuals, double *residual)
 {
-  // TODO!! units?
   double sigma = DEFAULT_PHASE_VAR_KF;
   // TODO
   double threshold = 22;
   // log the norm?
   double norm = vector_norm(num_dds, residuals) / sqrt(sigma);
   *residual = norm;
-#if SITL_MODE
-  log_double(norm);
-#endif
+  printf("SITL NORM %f\n", norm);
   return norm < threshold;
 }
 
 bool lesq_error(u8 num_sats)
 {
   return num_sats == 0;
+}
+
+static void log_baseline(bool okay, double b[3])
+{
+  printf("SITL BASELINE %i %f %f %f\n", okay, b[0], b[1], b[2]);
 }
 
 /* See lesq_solution_float for argument documentation
@@ -417,9 +419,11 @@ s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
     if (chi_test(num_dds, residuals, &residual)) {
       // solution with all sats ok
       //printf("OKAY: %i %f\n", num_dds, residual);
+      log_baseline(true, b);
       return num_dds_u8;
     } else {
       printf("BAD: %i %f\n", num_dds, residual);
+      log_baseline(false, b);
       if (num_dds < 4) {
         // just enough sats for a solution; can't search for solution after dropping one
         return 0;
@@ -497,7 +501,7 @@ s8 least_squares_solve_b_external_ambs(u8 num_dds_u8, const double *state_mean,
   double DE[num_dds * 3];
   assign_de_mtx(num_dds+1, sdiffs_with_ref_first, ref_ecef, DE);
 
-  u8 code = lesq_solve_and_check(num_dds_u8, dd_measurements, state_mean, DE, b);
+  s8 code = lesq_solve_and_check(num_dds_u8, dd_measurements, state_mean, DE, b);
   DEBUG_EXIT();
   return code;
 }

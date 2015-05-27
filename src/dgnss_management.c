@@ -251,7 +251,7 @@ static void dgnss_incorporate_observation(sdiff_t *sdiffs, double * dd_measureme
   DEBUG_ENTRY();
 
   double b2[3];
-  u8 code = least_squares_solve_b(&nkf, sdiffs, dd_measurements, reciever_ecef, b2);
+  s8 code = least_squares_solve_b(&nkf, sdiffs, dd_measurements, reciever_ecef, b2);
   (void)code;
 
   double ref_ecef[3];
@@ -315,7 +315,7 @@ void dgnss_update(u8 num_sats, sdiff_t *sdiffs, double reciever_ecef[3])
     dgnss_incorporate_observation(sdiffs_with_ref_first, dd_measurements, reciever_ecef);
 
     double b2[3];
-    u8 code = least_squares_solve_b(
+    s8 code = least_squares_solve_b(
         &nkf, sdiffs_with_ref_first, dd_measurements, reciever_ecef, b2);
 
     if (lesq_error(code)) {
@@ -507,7 +507,7 @@ s8 _dgnss_low_latency_float_baseline(u8 num_sdiffs, sdiff_t *sdiffs,
     DEBUG_EXIT();
     return -1;
   }
-  u8 code = least_squares_solve_b(&nkf, float_sdiffs, float_dd_measurements,
+  s8 code = least_squares_solve_b(&nkf, float_sdiffs, float_dd_measurements,
                                   ref_ecef, b);
   if (lesq_error(code)) {
     DEBUG_EXIT();
