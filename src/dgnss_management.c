@@ -251,7 +251,8 @@ static void dgnss_incorporate_observation(sdiff_t *sdiffs, double * dd_measureme
   DEBUG_ENTRY();
 
   double b2[3];
-  least_squares_solve_b(&nkf, sdiffs, dd_measurements, reciever_ecef, b2);
+  u8 code = least_squares_solve_b(&nkf, sdiffs, dd_measurements, reciever_ecef, b2);
+  (void)code;
 
   double ref_ecef[3];
 
@@ -314,7 +315,14 @@ void dgnss_update(u8 num_sats, sdiff_t *sdiffs, double reciever_ecef[3])
     dgnss_incorporate_observation(sdiffs_with_ref_first, dd_measurements, reciever_ecef);
 
     double b2[3];
-    least_squares_solve_b(&nkf, sdiffs_with_ref_first, dd_measurements, reciever_ecef, b2);
+    u8 code = least_squares_solve_b(
+        &nkf, sdiffs_with_ref_first, dd_measurements, reciever_ecef, b2);
+
+    if (lesq_error(code)) {
+      // TODO
+      DEBUG_EXIT();
+      return;
+    }
 
     ref_ecef[0] = reciever_ecef[0] + 0.5 * b2[0];
     ref_ecef[1] = reciever_ecef[1] + 0.5 * b2[1];
@@ -336,7 +344,12 @@ void dgnss_update(u8 num_sats, sdiff_t *sdiffs, double reciever_ecef[3])
   if (DEBUG) {
     if (num_sats >=4) {
       double b3[3];
-      least_squares_solve_b(&nkf, sdiffs_with_ref_first, dd_measurements, reciever_ecef, b3);
+      if (lesq_error(
+            least_squares_solve_b(
+              &nkf, sdiffs_with_ref_first, dd_measurements, reciever_ecef, b3))) {
+        DEBUG_EXIT();
+        return;
+      }
 
       ref_ecef[0] = reciever_ecef[0] + 0.5 * b3[0];
       ref_ecef[1] = reciever_ecef[1] + 0.5 * b3[1];
@@ -394,6 +407,7 @@ void dgnss_new_float_baseline(u8 num_sats, sdiff_t *sdiffs, double receiver_ecef
   make_measurements(num_sats-1, corrected_sdiffs, dd_measurements);
 
   least_squares_solve_b(&nkf, corrected_sdiffs, dd_measurements, receiver_ecef, b);
+  // TODO(dsk) is this okay given that lesq may use variable number of sats?
   *num_used = sats_management.num_sats;
   DEBUG_EXIT();
 }
@@ -431,8 +445,8 @@ s8 dgnss_fixed_baseline(u8 num_sdiffs, sdiff_t *sdiffs, double ref_ecef[3],
                 ambiguity_sdiffs, ref_ecef, DE);
   *num_used = ambiguity_test.amb_check.num_matching_ndxs + 1;
   s8 ret = lesq_solution_int(ambiguity_test.amb_check.num_matching_ndxs, dd_meas,
-                             ambiguity_test.amb_check.ambs, DE, b, 0);
-  if (ret) {
+                             ambiguity_test.amb_check.ambs, DE, b);
+  if (lesq_error(ret)) {
     log_error("dgnss_fixed_baseline: "
               "lesq_solution returned error %d\n", ret);
     DEBUG_EXIT();
@@ -493,8 +507,13 @@ s8 _dgnss_low_latency_float_baseline(u8 num_sdiffs, sdiff_t *sdiffs,
     DEBUG_EXIT();
     return -1;
   }
-  least_squares_solve_b(&nkf, float_sdiffs, float_dd_measurements,
-                        ref_ecef, b);
+  u8 code = least_squares_solve_b(&nkf, float_sdiffs, float_dd_measurements,
+                                  ref_ecef, b);
+  if (lesq_error(code)) {
+    DEBUG_EXIT();
+    return -1;
+  }
+  // TODO(dsk) is this okay given that lesq may use variable number of sats?
   *num_used = sats_management.num_sats;
   DEBUG_EXIT();
   return 0;
@@ -558,8 +577,8 @@ s8 _dgnss_low_latency_IAR_baseline(u8 num_sdiffs, sdiff_t *sdiffs,
                 ambiguity_sdiffs, ref_ecef, DE);
   *num_used = ambiguity_test.amb_check.num_matching_ndxs + 1;
   s8 ret = lesq_solution_int(ambiguity_test.amb_check.num_matching_ndxs,
-                             dd_meas, ambiguity_test.amb_check.ambs, DE, b, 0);
-  if (ret) {
+                             dd_meas, ambiguity_test.amb_check.ambs, DE, b);
+  if (lesq_error(ret)) {
     log_error("_dgnss_low_latency_IAR_baseline: "
               "lesq_solution returned error %d\n", ret);
     DEBUG_EXIT();
@@ -609,7 +628,7 @@ s8 dgnss_low_latency_baseline(u8 num_sdiffs, sdiff_t *sdiffs,
   /* if we get here, we weren't able to get an IAR resolved baseline.
    * Check if we can get a float baseline. */
   s8 float_ret_code = _dgnss_low_latency_float_baseline(num_sdiffs, sdiffs,
-                                              ref_ecef, num_used, b);
+                                                        ref_ecef, num_used, b);
   if (float_ret_code == 0) {
     log_debug("low latency float solution\n");
     DEBUG_EXIT();

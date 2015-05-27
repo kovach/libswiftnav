@@ -153,14 +153,14 @@ void amb_from_baseline(u8 num_dds, const double *DE, const double *dd_obs,
  *                -2 if an error occurred
  */
 s8 lesq_solution_int(u8 num_dds, const double *dd_obs, const s32 *N,
-                     const double *DE, double b[3], double *resid)
+                     const double *DE, double b[3])
 {
   assert(N != NULL);
   double N_float[num_dds];
   for (u8 i=0; i<num_dds; i++) {
     N_float[i] = N[i];
   }
-  return lesq_solution_float(num_dds, dd_obs, N_float, DE, b, resid);
+  return lesq_solve_and_check(num_dds, dd_obs, N_float, DE, b);
 }
 
 /* TODO use the state covariance matrix for a better estimate:
@@ -378,22 +378,34 @@ static s8 lesq_without_i(u8 dropped_dd, u8 num_dds, const double *dd_obs,
  * Scales least squares residuals by a priori covariance, compares against threshold.
  * Returns true if norm is below threshold.
  */
-static bool chi_test(u8 num_dds, double *resid)
+static bool chi_test(u8 num_dds, double *residuals, double *residual)
 {
+  // TODO!! units?
   double sigma = DEFAULT_PHASE_VAR_KF;
   // TODO
-  double threshold = 222;
-  return vector_norm(num_dds, resid) / sqrt(sigma) < threshold;
+  double threshold = 22;
+  // log the norm?
+  double norm = vector_norm(num_dds, residuals) / sqrt(sigma);
+  *residual = norm;
+#if SITL_MODE
+  log_double(norm);
+#endif
+  return norm < threshold;
+}
+
+bool lesq_error(u8 num_sats)
+{
+  return num_sats == 0;
 }
 
 /* See lesq_solution_float for argument documentation
- * Returns number of dds used in solution
+ * Returns number of dds used in solution. 0 for error
  *
  * TODO do any callers need to see residuals?
  *      replace calls in dgnss_fixed_baseline, _dgnss_low_lat
  */
-u8 least_squares_solve_and_check(u8 num_dds_u8, const double *dd_obs,
-                                 const double *N, const double *DE, double b[3])
+s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
+                        const double *N, const double *DE, double b[3])
 {
   integer num_dds = num_dds_u8;
   double residuals[num_dds];
@@ -401,10 +413,13 @@ u8 least_squares_solve_and_check(u8 num_dds_u8, const double *dd_obs,
   s8 okay = lesq_solution_float(num_dds_u8, dd_obs, N, DE, b, residuals);
 
   if (okay == 0) {
-    if (chi_test(num_dds, residuals)) {
+    double residual;
+    if (chi_test(num_dds, residuals, &residual)) {
       // solution with all sats ok
+      //printf("OKAY: %i %f\n", num_dds, residual);
       return num_dds_u8;
     } else {
+      printf("BAD: %i %f\n", num_dds, residual);
       if (num_dds < 4) {
         // just enough sats for a solution; can't search for solution after dropping one
         return 0;
@@ -415,7 +430,7 @@ u8 least_squares_solve_and_check(u8 num_dds_u8, const double *dd_obs,
 
         for (u8 i = 0; i < num_dds; i++) {
           lesq_without_i(i, num_dds, dd_obs, N, DE, b, residuals);
-          if (chi_test(new_dds, residuals)) {
+          if (chi_test(new_dds, residuals, &residual)) {
             num_passing++;
             bad_sat = i;
           }
@@ -424,13 +439,28 @@ u8 least_squares_solve_and_check(u8 num_dds_u8, const double *dd_obs,
         if (num_passing == 1) {
           /* bad_sat holds index of bad dd
            * Return solution without bad_sat */
+          printf("FOUND BAD SAT!\n");
+          // TODO remove this
+          for (u8 i = 0; i < num_dds; i++) {
+            lesq_without_i(i, num_dds, dd_obs, N, DE, b, residuals);
+            chi_test(new_dds, residuals, &residual);
+            printf("RESID %d: %f\n", i, residual);
+          }
           lesq_without_i(bad_sat, num_dds, dd_obs, N, DE, b, 0);
           return new_dds;
         } else if (num_passing == 0) {
           // ref sat is bad?
+          printf("FOUND BAD REF SAT?\n");
+          // TODO remove this
+          for (u8 i = 0; i < num_dds; i++) {
+            lesq_without_i(i, num_dds, dd_obs, N, DE, b, residuals);
+            chi_test(new_dds, residuals, &residual);
+            printf("RESID %d: %f\n", i, residual);
+          }
           return 0;
         } else {
           // ?
+          printf("CONFUSING DATA\n");
           return 0;
         }
       }
@@ -457,7 +487,7 @@ u8 least_squares_solve_and_check(u8 num_dds_u8, const double *dd_obs,
  *                              computing the sat direction vectors.
  * \param b                     The output baseline in meters.
  */
-void least_squares_solve_b_external_ambs(u8 num_dds_u8, const double *state_mean,
+s8 least_squares_solve_b_external_ambs(u8 num_dds_u8, const double *state_mean,
          const sdiff_t *sdiffs_with_ref_first, const double *dd_measurements,
          const double ref_ecef[3], double b[3])
 {
@@ -467,10 +497,9 @@ void least_squares_solve_b_external_ambs(u8 num_dds_u8, const double *state_mean
   double DE[num_dds * 3];
   assign_de_mtx(num_dds+1, sdiffs_with_ref_first, ref_ecef, DE);
 
-  s8 ret = lesq_solution_float(num_dds_u8, dd_measurements, state_mean,
-                               DE, b, 0);
-  (void)ret;
+  u8 code = lesq_solve_and_check(num_dds_u8, dd_measurements, state_mean, DE, b);
   DEBUG_EXIT();
+  return code;
 }
 
 /** \} */
