@@ -16,6 +16,10 @@
 #include "common.h"
 #include "single_diff.h"
 
+#define SITL_LOGGING false
+
+int LESQ_CALLER;
+
 void predict_carrier_obs(u8 num_dds, const double *N, const double *DE,
                          const double b[3], double *dd_obs);
 

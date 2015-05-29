@@ -327,6 +327,15 @@ void dgnss_update(u8 num_sats, sdiff_t *sdiffs, double reciever_ecef[3])
     ref_ecef[0] = reciever_ecef[0] + 0.5 * b2[0];
     ref_ecef[1] = reciever_ecef[1] + 0.5 * b2[1];
     ref_ecef[2] = reciever_ecef[2] + 0.5 * b2[2];
+
+    if (SITL_LOGGING) {
+      u8 num_used;
+      double base[3];
+      LESQ_CALLER = 1;
+      dgnss_new_float_baseline(num_sats, sdiffs, ref_ecef,
+                               &num_used, base);
+      LESQ_CALLER = 0;
+    }
   }
 
   u8 changed_sats = ambiguity_update_sats(&ambiguity_test, num_sats, sdiffs,
@@ -392,8 +401,10 @@ s8 dgnss_iar_get_single_hyp(double *dhyp)
   return ret;
 }
 
-void dgnss_new_float_baseline(u8 num_sats, sdiff_t *sdiffs, double receiver_ecef[3], u8 *num_used, double b[3])
+void dgnss_new_float_baseline(u8 num_sats, sdiff_t *sdiffs, double receiver_ecef[3],
+                              u8 *num_used, double b[3])
 {
+  printf("FLOAT BASELINE\n");
   DEBUG_ENTRY();
   sdiff_t corrected_sdiffs[num_sats];
 
@@ -421,6 +432,7 @@ void dgnss_new_float_baseline(u8 num_sats, sdiff_t *sdiffs, double receiver_ecef
 s8 dgnss_fixed_baseline(u8 num_sdiffs, sdiff_t *sdiffs, double ref_ecef[3],
                         u8 *num_used, double b[3])
 {
+  printf("FIXED BASELINE\n");
   if (!ambiguity_iar_can_solve(&ambiguity_test)) {
     return 0;
   }
@@ -484,6 +496,7 @@ s8 dgnss_fixed_baseline(u8 num_sdiffs, sdiff_t *sdiffs, double ref_ecef[3],
 s8 _dgnss_low_latency_float_baseline(u8 num_sdiffs, sdiff_t *sdiffs,
                                      double ref_ecef[3], u8 *num_used, double b[3])
 {
+  printf("LOW LAT FLOAT BASELINE\n");
   DEBUG_ENTRY();
   if (num_sdiffs < 4 || sats_management.num_sats < 4) {
     /* For a position solution, we need at least 4 sats. That means we must
@@ -550,6 +563,7 @@ s8 _dgnss_low_latency_float_baseline(u8 num_sdiffs, sdiff_t *sdiffs,
 s8 _dgnss_low_latency_IAR_baseline(u8 num_sdiffs, sdiff_t *sdiffs,
                                    double ref_ecef[3], u8 *num_used, double b[3])
 {
+  printf("LOW LAT IAR BASELINE\n");
   DEBUG_ENTRY();
   assert(num_sdiffs >= 4);
   if (!ambiguity_iar_can_solve(&ambiguity_test)) {

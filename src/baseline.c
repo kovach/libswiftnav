@@ -25,8 +25,6 @@
 #include "filter_utils.h"
 #include "dgnss_management.h"
 
-#define SITL_LOGGING false
-
 /** \defgroup baseline Baseline calculations
  * Functions for relating the baseline vector with carrier phase observations
  * and ambiguities.
@@ -398,11 +396,13 @@ bool lesq_error(u8 num_sats)
   return num_sats == 0;
 }
 
-static void log_baseline(int okay, double b[3])
+static void log_baseline(int code, int okay, double b[3])
 {
   if (SITL_LOGGING)
-    printf("SITL BASELINE %i %f %f %f\n", okay, b[0], b[1], b[2]);
+    printf("SITL BASELINE %i %i %f %f %f\n", code, okay, b[0], b[1], b[2]);
 }
+
+int LESQ_CALLER;
 
 /* See lesq_solution_float for argument documentation
  * Returns number of dds used in solution. 0 for error
@@ -413,6 +413,9 @@ static void log_baseline(int okay, double b[3])
 s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
                         const double *N, const double *DE, double b[3])
 {
+  // Accompanies logged baselines
+  int code = LESQ_CALLER;
+
   integer num_dds = num_dds_u8;
   double residuals[num_dds];
 
@@ -423,12 +426,14 @@ s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
     if (chi_test(num_dds, residuals, &residual)) {
       // solution with all sats ok
       //printf("OKAY: %i %f\n", num_dds, residual);
-      log_baseline(1, b);
+      log_baseline(code, 1, b);
       return num_dds_u8;
     } else {
       if (SITL_LOGGING)
-        printf("BAD: %i %f\n", num_dds, residual);
-      log_baseline(0, b);
+        printf("BAD: %i %f\n", num_dds_u8, residual);
+      log_baseline(code, 0, b);
+      // TODO TODO
+      return num_dds_u8;
       if (num_dds < 4) {
         // just enough sats for a solution; can't search for solution after dropping one
         return 0;
@@ -457,7 +462,7 @@ s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
           //  printf("RESID %d: %f\n", i, residual);
           //}
           lesq_without_i(bad_sat, num_dds, dd_obs, N, DE, b, 0);
-          log_baseline(2, b);
+          log_baseline(code, 2, b);
           return new_dds;
         } else if (num_passing == 0) {
           // ref sat is bad?
