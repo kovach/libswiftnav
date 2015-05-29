@@ -402,8 +402,6 @@ static void log_baseline(int code, int okay, double b[3])
     printf("SITL BASELINE %i %i %f %f %f\n", code, okay, b[0], b[1], b[2]);
 }
 
-int LESQ_CALLER;
-
 /* See lesq_solution_float for argument documentation
  * Returns number of dds used in solution. 0 for error
  *
@@ -414,7 +412,7 @@ s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
                         const double *N, const double *DE, double b[3])
 {
   // Accompanies logged baselines
-  int code = LESQ_CALLER;
+  int code = 0;
 
   integer num_dds = num_dds_u8;
   double residuals[num_dds];

@@ -331,10 +331,8 @@ void dgnss_update(u8 num_sats, sdiff_t *sdiffs, double reciever_ecef[3])
     if (SITL_LOGGING) {
       u8 num_used;
       double base[3];
-      LESQ_CALLER = 1;
       dgnss_new_float_baseline(num_sats, sdiffs, ref_ecef,
                                &num_used, base);
-      LESQ_CALLER = 0;
     }
   }
 
