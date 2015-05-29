@@ -25,6 +25,8 @@
 #include "filter_utils.h"
 #include "dgnss_management.h"
 
+#define SITL_LOGGING false
+
 /** \defgroup baseline Baseline calculations
  * Functions for relating the baseline vector with carrier phase observations
  * and ambiguities.
@@ -386,7 +388,8 @@ static bool chi_test(u8 num_dds, double *residuals, double *residual)
   // log the norm?
   double norm = vector_norm(num_dds, residuals) / sqrt(sigma);
   *residual = norm;
-  printf("SITL NORM %f\n", norm);
+  if (SITL_LOGGING)
+    printf("SITL NORM %i %f\n", num_dds, norm);
   return norm < threshold;
 }
 
@@ -395,9 +398,10 @@ bool lesq_error(u8 num_sats)
   return num_sats == 0;
 }
 
-static void log_baseline(bool okay, double b[3])
+static void log_baseline(int okay, double b[3])
 {
-  printf("SITL BASELINE %i %f %f %f\n", okay, b[0], b[1], b[2]);
+  if (SITL_LOGGING)
+    printf("SITL BASELINE %i %f %f %f\n", okay, b[0], b[1], b[2]);
 }
 
 /* See lesq_solution_float for argument documentation
@@ -419,11 +423,12 @@ s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
     if (chi_test(num_dds, residuals, &residual)) {
       // solution with all sats ok
       //printf("OKAY: %i %f\n", num_dds, residual);
-      log_baseline(true, b);
+      log_baseline(1, b);
       return num_dds_u8;
     } else {
-      printf("BAD: %i %f\n", num_dds, residual);
-      log_baseline(false, b);
+      if (SITL_LOGGING)
+        printf("BAD: %i %f\n", num_dds, residual);
+      log_baseline(0, b);
       if (num_dds < 4) {
         // just enough sats for a solution; can't search for solution after dropping one
         return 0;
@@ -443,28 +448,30 @@ s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
         if (num_passing == 1) {
           /* bad_sat holds index of bad dd
            * Return solution without bad_sat */
-          printf("FOUND BAD SAT!\n");
+          if (SITL_LOGGING)
+            printf("FOUND BAD SAT!\n");
           // TODO remove this
-          for (u8 i = 0; i < num_dds; i++) {
-            lesq_without_i(i, num_dds, dd_obs, N, DE, b, residuals);
-            chi_test(new_dds, residuals, &residual);
-            printf("RESID %d: %f\n", i, residual);
-          }
+          //for (u8 i = 0; i < num_dds; i++) {
+          //  lesq_without_i(i, num_dds, dd_obs, N, DE, b, residuals);
+          //  chi_test(new_dds, residuals, &residual);
+          //  printf("RESID %d: %f\n", i, residual);
+          //}
           lesq_without_i(bad_sat, num_dds, dd_obs, N, DE, b, 0);
+          log_baseline(2, b);
           return new_dds;
         } else if (num_passing == 0) {
           // ref sat is bad?
-          printf("FOUND BAD REF SAT?\n");
           // TODO remove this
-          for (u8 i = 0; i < num_dds; i++) {
-            lesq_without_i(i, num_dds, dd_obs, N, DE, b, residuals);
-            chi_test(new_dds, residuals, &residual);
-            printf("RESID %d: %f\n", i, residual);
-          }
+          //printf("FOUND BAD REF SAT?\n");
+          //for (u8 i = 0; i < num_dds; i++) {
+          //  lesq_without_i(i, num_dds, dd_obs, N, DE, b, residuals);
+          //  chi_test(new_dds, residuals, &residual);
+          //  printf("RESID %d: %f\n", i, residual);
+          //}
           return 0;
         } else {
           // ?
-          printf("CONFUSING DATA\n");
+          //printf("CONFUSING DATA\n");
           return 0;
         }
       }
