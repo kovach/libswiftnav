@@ -16,7 +16,9 @@
 #include "common.h"
 #include "single_diff.h"
 
-#define SITL_LOGGING false
+#define SITL_LOGGING true
+int LESQ_CALLER;
+extern int TIME_STEP;
 
 void predict_carrier_obs(u8 num_dds, const double *N, const double *DE,
                          const double b[3], double *dd_obs);
@@ -27,6 +29,7 @@ void amb_from_baseline(u8 num_dds, const double *DE, const double *dd_obs,
 s8 lesq_solution_float(u8 num_dds, const double *dd_obs, const double *N,
                        const double *DE, double b[3], double *resid)
                          __attribute__((warn_unused_result));
+
 s8 lesq_solution_int(u8 num_dds, const double *dd_obs, const s32 *N,
                      const double *DE, double b[3])
                        __attribute__((warn_unused_result));

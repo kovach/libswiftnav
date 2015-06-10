@@ -250,6 +250,13 @@ static void dgnss_incorporate_observation(sdiff_t *sdiffs, double * dd_measureme
 {
   DEBUG_ENTRY();
 
+  // TODO 2222
+  // move to dgnss_update?
+  // log timestep + sdiff prns (not off by one)
+  // join with residuals
+  // check sats on repair
+  TIME_STEP++;
+
   double b2[3];
   s8 code = least_squares_solve_b(&nkf, sdiffs, dd_measurements, reciever_ecef, b2);
   (void)code;
@@ -315,6 +322,7 @@ void dgnss_update(u8 num_sats, sdiff_t *sdiffs, double reciever_ecef[3])
     dgnss_incorporate_observation(sdiffs_with_ref_first, dd_measurements, reciever_ecef);
 
     double b2[3];
+    LESQ_CALLER = 0;
     s8 code = least_squares_solve_b(
         &nkf, sdiffs_with_ref_first, dd_measurements, reciever_ecef, b2);
 
@@ -329,10 +337,16 @@ void dgnss_update(u8 num_sats, sdiff_t *sdiffs, double reciever_ecef[3])
     ref_ecef[2] = reciever_ecef[2] + 0.5 * b2[2];
 
     if (SITL_LOGGING) {
+      // Calculate a baseline and calculate baselines for checking
       u8 num_used;
       double base[3];
+      LESQ_CALLER = 1;
       dgnss_new_float_baseline(num_sats, sdiffs, ref_ecef,
                                &num_used, base);
+      LESQ_CALLER = 2;
+      dgnss_fixed_baseline(num_sats, sdiffs, ref_ecef,
+                           &num_used, base);
+      LESQ_CALLER = 0;
     }
   }
 
@@ -402,7 +416,6 @@ s8 dgnss_iar_get_single_hyp(double *dhyp)
 void dgnss_new_float_baseline(u8 num_sats, sdiff_t *sdiffs, double receiver_ecef[3],
                               u8 *num_used, double b[3])
 {
-  printf("FLOAT BASELINE\n");
   DEBUG_ENTRY();
   sdiff_t corrected_sdiffs[num_sats];
 
@@ -430,7 +443,6 @@ void dgnss_new_float_baseline(u8 num_sats, sdiff_t *sdiffs, double receiver_ecef
 s8 dgnss_fixed_baseline(u8 num_sdiffs, sdiff_t *sdiffs, double ref_ecef[3],
                         u8 *num_used, double b[3])
 {
-  printf("FIXED BASELINE\n");
   if (!ambiguity_iar_can_solve(&ambiguity_test)) {
     return 0;
   }

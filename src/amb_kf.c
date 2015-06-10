@@ -531,6 +531,10 @@ s32 find_index_of_element_in_u8s(const u32 num_elements, const u8 x, const u8 *l
       return i;
     }
   }
+  printf("failed to find: %i\n", x);
+  for (u32 i=0; i<num_elements; i++) {
+    printf("prn: %i\n", list[i]);
+  }
   assert(false);
 }
 
