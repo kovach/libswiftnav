@@ -411,10 +411,15 @@ static void log_baseline(int okay, double b[3], int num_dds, double *residuals)
 }
 
 /* See lesq_solution_float for argument documentation
- * Returns number of dds used in solution. 0 for error
+ * Return values:
+ *    0: solution with all dd's ok
+ *    1: repaired solution, using one fewer observation
+ *       returns index of removed observation if removed_obs ptr is passed
+ *   -1: no reasonable solution possible
  */
 s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
-                        const double *N, const double *DE, double b[3])
+                        const double *N, const double *DE, double b[3],
+                        u8 *removed_obs)
 {
   integer num_dds = num_dds_u8;
   double residuals[num_dds];
@@ -424,15 +429,15 @@ s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
   if (okay == 0) {
     double residual;
     if (chi_test(num_dds, residuals, &residual)) {
-      // solution with all sats ok
+      /* Solution using all sats ok. */
       //printf("OKAY: %i %f\n", num_dds, residual);
       log_baseline(0, b, num_dds, residuals);
-      return num_dds_u8;
+      return 0;
     } else {
       log_baseline(1, b, num_dds, residuals);
       if (num_dds < 4) {
         // just enough sats for a solution; can't search for solution after dropping one
-        return 0;
+        return -1;
       } else {
         u8 num_passing = 0;
         u8 bad_sat = -1;
@@ -448,38 +453,26 @@ s8 lesq_solve_and_check(u8 num_dds_u8, const double *dd_obs,
 
         if (num_passing == 1) {
           /* bad_sat holds index of bad dd
-           * Return solution without bad_sat */
+           * Return solution without bad_sat. */
           if (SITL_LOGGING)
             printf("FOUND BAD SAT!\n");
-          // TODO remove this
-          //for (u8 i = 0; i < num_dds; i++) {
-          //  lesq_without_i(i, num_dds, dd_obs, N, DE, b, residuals);
-          //  chi_test(new_dds, residuals, &residual);
-          //  printf("RESID %d: %f\n", i, residual);
-          //}
           lesq_without_i(bad_sat, num_dds, dd_obs, N, DE, b, residuals);
-          log_baseline(2, b, num_dds, residuals);
-          return new_dds;
+          if (removed_obs) {
+            *removed_obs = bad_sat;
+          }
+          return 1;
         } else if (num_passing == 0) {
           // ref sat is bad?
-          // TODO remove this
-          //printf("FOUND BAD REF SAT?\n");
-          //for (u8 i = 0; i < num_dds; i++) {
-          //  lesq_without_i(i, num_dds, dd_obs, N, DE, b, residuals);
-          //  chi_test(new_dds, residuals, &residual);
-          //  printf("RESID %d: %f\n", i, residual);
-          //}
-          return 0;
+          return -1;
         } else {
           // ?
-          //printf("CONFUSING DATA\n");
-          return 0;
+          return -1;
         }
       }
     }
   } else {
-    // not enough sats or other error with initial lesq solution
-    return 0;
+    /* Not enough sats or other error returned by initial lesq solution. */
+    return -1;
   }
 }
 
